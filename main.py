@@ -72,18 +72,25 @@ def M(i, j, n, k):
     s2 = strats[j]
     return match(s1, s2)
 
-def loss(a, n, k):
-    res = [0] * k
-    for i in range(k):
-        acc = 0.
-        for j in range(k):
+def exps(a, n, k):
+    lstrats = len(S(n, k))
+    res = [0] * lstrats
+    for i in range(lstrats):
+        for j in range(lstrats):
             res[i] += M(i, j, n, k) * a[j]
-    return sum(res)
+    return res
 
-N = 10
-K = 4
+def main():
+    n = 9
+    k = 3
+    strats = S(n, k)
+    lstrats = len(strats)
 
-a0 = [9, 2, 2, 1]
-a0 = [ai/float(K) for ai in a0]
+    a0 = [1.] * lstrats
+    a0 = [ai/float(sum(a0)) for ai in a0]
 
-print(loss(a0, N, K))
+    e = exps(a0, n, k)
+    pprint(list(zip(strats, e)))
+
+if __name__ == '__main__':
+    main()
