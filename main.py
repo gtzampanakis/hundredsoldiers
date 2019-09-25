@@ -1,5 +1,8 @@
 from pprint import pprint
 from itertools import permutations
+
+import numpy.linalg
+
 from pmemoize import MemoizedFunction
 
 @MemoizedFunction
@@ -81,16 +84,25 @@ def exps(a, n, k):
     return res
 
 def main():
-    n = 9
+    n = 5
     k = 3
     strats = S(n, k)
     lstrats = len(strats)
 
-    a0 = [1.] * lstrats
+    a0 = range(lstrats)
     a0 = [ai/float(sum(a0)) for ai in a0]
 
     e = exps(a0, n, k)
     pprint(list(zip(strats, e)))
+    pprint(sum(e))
+
+    MI = numpy.zeros((lstrats, lstrats))
+    for i in range(lstrats):
+        for j in range(lstrats):
+            MI[i,j] = M(i, j, n, k)
+
+    B = numpy.zeros((lstrats,))
+    numpy.linalg.solve(MI, B)
 
 if __name__ == '__main__':
     main()
