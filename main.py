@@ -1,7 +1,9 @@
 from pprint import pprint
 from itertools import permutations
 
-import numpy.linalg
+import scipy as sp
+import scipy.linalg as spl
+import scipy.optimize as spo
 
 from pmemoize import MemoizedFunction
 
@@ -84,25 +86,37 @@ def exps(a, n, k):
     return res
 
 def main():
-    n = 5
+    n = 4
     k = 3
     strats = S(n, k)
-    lstrats = len(strats)
+    l = len(strats)
 
-    a0 = range(lstrats)
+    a0 = range(l)
     a0 = [ai/float(sum(a0)) for ai in a0]
 
     e = exps(a0, n, k)
     pprint(list(zip(strats, e)))
     pprint(sum(e))
 
-    MI = numpy.zeros((lstrats, lstrats))
-    for i in range(lstrats):
-        for j in range(lstrats):
+    MI = sp.zeros((l, l))
+    for i in range(l):
+        for j in range(l):
             MI[i,j] = M(i, j, n, k)
 
-    B = numpy.zeros((lstrats,))
-    numpy.linalg.solve(MI, B)
+    A = sp.vstack((MI, sp.ones((1, l))))
+    B = sp.array(([0.] * l) + [1.])
+
+    def fun(x):
+        return sp.dot(A, x) - B
+
+    res = spo.least_squares(
+        fun = fun,
+        x0 = sp.ones(l) / l,
+        bounds = (0., 1.),
+    )
+    pprint(res)
+    pprint(list(zip(strats, ['%.5f' % n for n in res['x']])))
+
 
 if __name__ == '__main__':
     main()
