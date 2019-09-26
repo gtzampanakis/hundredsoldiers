@@ -1,9 +1,11 @@
 from pprint import pprint
 from itertools import permutations
 
+import numpy as np
 import scipy as sp
 import scipy.linalg as spl
 import scipy.optimize as spo
+import numpy.linalg as nl
 
 from pmemoize import MemoizedFunction
 
@@ -71,8 +73,7 @@ def match(s1, s2):
         return 0
 
 @MemoizedFunction
-def M(i, j, n, k):
-    strats = S(n, k)
+def M(strats, i, j):
     s1 = strats[i]
     s2 = strats[j]
     return match(s1, s2)
@@ -88,21 +89,37 @@ def exps(a, n, k):
 def main():
     n = 4
     k = 3
-    strats = S(n, k)
-    l = len(strats)
 
-    a0 = range(l)
-    a0 = [ai/float(sum(a0)) for ai in a0]
+    strats = tuple(S(n, k))
 
-    e = exps(a0, n, k)
-    pprint(list(zip(strats, e)))
-    pprint(sum(e))
+    # Remove dominated strategies.
+    while 1:
+        l = len(strats)
 
-    MI = sp.zeros((l, l))
-    for i in range(l):
-        for j in range(l):
-            MI[i,j] = M(i, j, n, k)
+        MI = sp.zeros((l, l))
+        for i in range(l):
+            for j in range(l):
+                MI[i,j] = M(strats, i, j)
 
+        dominated = []
+        for i1 in range(l):
+            for i2 in range(i1 + 1, l):
+                if i1 in dominated or i2 in dominated:
+                    continue
+                diff = MI[i1,:] >= MI[i2,:]
+                if all(diff):
+                    dominated.append(i2)
+                diff = MI[i1,:] <= MI[i2,:]
+                if all(diff):
+                    dominated.append(i1)
+
+        if not dominated:
+            break
+
+        strats = tuple(s for (si, s) in enumerate(strats) if si not in dominated)
+
+        print('Removed %s dominated strategies' % len(dominated))
+        
     A = sp.vstack((MI, sp.ones((1, l))))
     B = sp.array(([0.] * l) + [1.])
 
@@ -115,7 +132,15 @@ def main():
         bounds = (0., 1.),
     )
     pprint(res)
-    pprint(list(zip(strats, ['%.5f' % n for n in res['x']])))
+    pprint('')
+    pprint(('MI shape:', MI.shape))
+    pprint(('MI rank:', nl.matrix_rank(MI)))
+    pprint(list(zip(
+        strats,
+        ['%.5f' % n for n in res['x']],
+        MI.sum(1),
+    )))
+    pprint(sum(res['x']))
 
 
 if __name__ == '__main__':
