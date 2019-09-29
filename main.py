@@ -1,5 +1,6 @@
+import sys
 from pprint import pprint
-from itertools import permutations
+from itertools import combinations, permutations
 
 import numpy as np
 import scipy as sp
@@ -46,12 +47,12 @@ def P(n, k):
     return res
 
 @MemoizedFunction
-def S(n, k):
+def S(parts):
     """
     Available strategies.
     """
     res = []
-    for pj in P(n, k):
+    for pj in parts:
         for c in permutations(pj):
             if c not in res:
                 res.append(c)
@@ -78,69 +79,78 @@ def M(strats, i, j):
     s2 = strats[j]
     return match(s1, s2)
 
-def exps(a, n, k):
-    lstrats = len(S(n, k))
-    res = [0] * lstrats
-    for i in range(lstrats):
-        for j in range(lstrats):
-            res[i] += M(i, j, n, k) * a[j]
-    return res
-
 def main():
-    n = 4
-    k = 3
+    n = 8
+    k = 4
 
-    strats = tuple(S(n, k))
+    parts_full = tuple(P(n, k))
+    lpf = len(parts_full)
 
-    # Remove dominated strategies.
-    while 1:
-        l = len(strats)
+    # Pick subset.
+    for r in range(lpf, 0, -1):
+        for comb in combinations(range(lpf), r):
+            parts = tuple(parts_full[i] for i in comb)
+            strats = tuple(S(parts))
 
-        MI = sp.zeros((l, l))
-        for i in range(l):
-            for j in range(l):
-                MI[i,j] = M(strats, i, j)
+            # Remove dominated strategies.
+            while 1:
+                l = len(strats)
 
-        dominated = []
-        for i1 in range(l):
-            for i2 in range(i1 + 1, l):
-                if i1 in dominated or i2 in dominated:
-                    continue
-                diff = MI[i1,:] >= MI[i2,:]
-                if all(diff):
-                    dominated.append(i2)
-                diff = MI[i1,:] <= MI[i2,:]
-                if all(diff):
-                    dominated.append(i1)
+                MI = sp.zeros((l, l))
+                for i in range(l):
+                    for j in range(l):
+                        MI[i,j] = M(strats, i, j)
 
-        if not dominated:
-            break
+                dominated = []
+                for i1 in range(l):
+                    for i2 in range(i1 + 1, l):
+                        if i1 in dominated or i2 in dominated:
+                            continue
+                        diff = MI[i1,:] >= MI[i2,:]
+                        if all(diff):
+                            dominated.append(i2)
+                        diff = MI[i1,:] <= MI[i2,:]
+                        if all(diff):
+                            dominated.append(i1)
 
-        strats = tuple(s for (si, s) in enumerate(strats) if si not in dominated)
+                if not dominated:
+                    break
 
-        print('Removed %s dominated strategies' % len(dominated))
-        
-    A = sp.vstack((MI, sp.ones((1, l))))
-    B = sp.array(([0.] * l) + [1.])
+                print('Removing %s dominated strategies: %s' % (
+                    len(dominated), [strats[d] for d in dominated]
+                ))
 
-    def fun(x):
-        return sp.dot(A, x) - B
+                strats = tuple(s for (si, s) in enumerate(strats) if si not in dominated)
 
-    res = spo.least_squares(
-        fun = fun,
-        x0 = sp.ones(l) / l,
-        bounds = (0., 1.),
-    )
-    pprint(res)
-    pprint('')
-    pprint(('MI shape:', MI.shape))
-    pprint(('MI rank:', nl.matrix_rank(MI)))
-    pprint(list(zip(
-        strats,
-        ['%.5f' % n for n in res['x']],
-        MI.sum(1),
-    )))
-    pprint(sum(res['x']))
+            A_eq = sp.vstack((
+                sp.ones((1, l)),
+                MI,
+            ))
+
+            b_eq = sp.concatenate((
+                sp.ones(1),
+                sp.zeros(l),
+            ))
+
+            res = spo.linprog(
+                c = MI[0,:],
+                A_eq = A_eq,
+                b_eq = b_eq,
+                bounds = (0., 1.),
+            )
+            if res['success']:
+                pprint(res)
+                pprint('')
+                pprint(('comb:', comb))
+                pprint(('MI shape:', MI.shape))
+                pprint(('MI rank:', nl.matrix_rank(MI)))
+                pprint(list(zip(
+                    strats,
+                    ['%.5f' % n for n in res['x']],
+                    MI.sum(1),
+                )))
+                pprint(sum(res['x']))
+                sys.exit()
 
 
 if __name__ == '__main__':
