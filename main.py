@@ -80,64 +80,78 @@ def M(strats, i, j):
     return match(s1, s2)
 
 def main():
-    n = 8
-    k = 4
+    n = 5
+    k = 3
 
     parts_full = tuple(P(n, k))
-    lpf = len(parts_full)
 
-    # Pick subset.
+    # Remove dominated strategies.
+    strats_full = tuple(S(parts_full))
+    while 1:
+        l = len(strats_full)
+
+        MI = sp.zeros((l, l))
+        for i in range(l):
+            for j in range(l):
+                MI[i,j] = M(strats_full, i, j)
+
+        dominated = []
+        for i1 in range(l):
+            for i2 in range(i1 + 1, l):
+                if i1 in dominated or i2 in dominated:
+                    continue
+                diff = MI[i1,:] >= MI[i2,:]
+                if all(diff):
+                    dominated.append(i2)
+                diff = MI[i1,:] <= MI[i2,:]
+                if all(diff):
+                    dominated.append(i1)
+
+        if not dominated:
+            break
+
+        print('Removing %s dominated strategies: %s' % (
+            len(dominated), [strats_full[d] for d in dominated]
+        ))
+
+        strats_full = tuple(s for (si, s) in enumerate(strats_full) if si not in dominated)
+
+    parts_full = sorted(set(tuple(sorted(s, reverse=True)) for s in strats_full))
+    lpf = len(parts_full)
+    lsf = len(strats_full)
+
+    # Try subsets.
     for r in range(lpf, 0, -1):
         for comb in combinations(range(lpf), r):
             parts = tuple(parts_full[i] for i in comb)
             strats = tuple(S(parts))
+            l = len(strats)
 
-            # Remove dominated strategies.
-            while 1:
-                l = len(strats)
-
-                MI = sp.zeros((l, l))
-                for i in range(l):
-                    for j in range(l):
-                        MI[i,j] = M(strats, i, j)
-
-                dominated = []
-                for i1 in range(l):
-                    for i2 in range(i1 + 1, l):
-                        if i1 in dominated or i2 in dominated:
-                            continue
-                        diff = MI[i1,:] >= MI[i2,:]
-                        if all(diff):
-                            dominated.append(i2)
-                        diff = MI[i1,:] <= MI[i2,:]
-                        if all(diff):
-                            dominated.append(i1)
-
-                if not dominated:
-                    break
-
-                print('Removing %s dominated strategies: %s' % (
-                    len(dominated), [strats[d] for d in dominated]
-                ))
-
-                strats = tuple(s for (si, s) in enumerate(strats) if si not in dominated)
+            MI = sp.zeros((lsf, l))
+            for i in range(lsf):
+                for j in range(l):
+                    MI[i,j] = match(
+                        strats_full[i],
+                        strats[j],
+                    )
 
             A_eq = sp.vstack((
-                sp.ones((1, l)),
                 MI,
+                sp.ones((1, l)),
             ))
 
             b_eq = sp.concatenate((
+                sp.zeros(lsf),
                 sp.ones(1),
-                sp.zeros(l),
             ))
 
             res = spo.linprog(
-                c = MI[0,:],
+                c = sp.zeros(l),
                 A_eq = A_eq,
                 b_eq = b_eq,
                 bounds = (0., 1.),
             )
+            print(res)
             if res['success']:
                 pprint(res)
                 pprint('')
