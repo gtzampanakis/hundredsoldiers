@@ -1,4 +1,4 @@
-import sys
+import sys, time
 from pprint import pprint
 from itertools import combinations, permutations
 
@@ -80,49 +80,23 @@ def M(strats, i, j):
     return match(s1, s2)
 
 def main():
-    n = 5
-    k = 3
+    t0 = time.time()
+
+    n = 6
+    k = 4
 
     parts_full = tuple(P(n, k))
-
-    # Remove dominated strategies.
     strats_full = tuple(S(parts_full))
-    while 1:
-        l = len(strats_full)
-
-        MI = sp.zeros((l, l))
-        for i in range(l):
-            for j in range(l):
-                MI[i,j] = M(strats_full, i, j)
-
-        dominated = []
-        for i1 in range(l):
-            for i2 in range(i1 + 1, l):
-                if i1 in dominated or i2 in dominated:
-                    continue
-                diff = MI[i1,:] >= MI[i2,:]
-                if all(diff):
-                    dominated.append(i2)
-                diff = MI[i1,:] <= MI[i2,:]
-                if all(diff):
-                    dominated.append(i1)
-
-        if not dominated:
-            break
-
-        print('Removing %s dominated strategies: %s' % (
-            len(dominated), [strats_full[d] for d in dominated]
-        ))
-
-        strats_full = tuple(s for (si, s) in enumerate(strats_full) if si not in dominated)
-
     parts_full = sorted(set(tuple(sorted(s, reverse=True)) for s in strats_full))
+
     lpf = len(parts_full)
     lsf = len(strats_full)
 
     # Try subsets.
+    combi = 0
     for r in range(lpf, 0, -1):
         for comb in combinations(range(lpf), r):
+            combi += 1
             parts = tuple(parts_full[i] for i in comb)
             strats = tuple(S(parts))
             l = len(strats)
@@ -135,34 +109,40 @@ def main():
                         strats[j],
                     )
 
-            A_eq = sp.vstack((
-                MI,
-                sp.ones((1, l)),
-            ))
+# Sum of our probabilities should be 1.
+            A_eq = sp.ones((1, l))
+            b_eq = sp.ones(1)
 
-            b_eq = sp.concatenate((
-                sp.zeros(lsf),
-                sp.ones(1),
-            ))
+# Each opponent strategy should yield zero or less. Note that if all of them
+# yielded less than zero then we wouldn't be at an equilibrium (because an
+# equilibrium in a symmetric zero-sum game has to have zero value for both
+# players) but we don't need to worry about this because the opponent
+# strategies are a superset of ours so one of them has to be the same and that
+# one is guaranteed to have an expected value of zero.
+            A_ub = MI
+            b_ub = sp.zeros(lsf)
 
+            t1 = time.time()
+            print('Calling spo.linprog after %.3f seconds' % (t1-t0))
             res = spo.linprog(
-                c = sp.zeros(l),
+                c = sp.ones(l),
                 A_eq = A_eq,
                 b_eq = b_eq,
+                A_ub = A_ub,
+                b_ub = b_ub,
                 bounds = (0., 1.),
             )
-            print(res)
             if res['success']:
-                pprint(res)
-                pprint('')
-                pprint(('comb:', comb))
+                pprint(('combi:', combi))
+                pprint(('len(comb):', len(comb)))
                 pprint(('MI shape:', MI.shape))
                 pprint(('MI rank:', nl.matrix_rank(MI)))
-                pprint(list(zip(
-                    strats,
-                    ['%.5f' % n for n in res['x']],
-                    MI.sum(1),
-                )))
+                pprint(sorted(set(
+                    row for row in zip(
+                        [tuple(sorted(s, reverse=True)) for s in strats],
+                        ['%.5f' % n for n in res['x']],
+                    ) if float(row[1]) > 1e-5
+                ), key=lambda row: row[1], reverse=True))
                 pprint(sum(res['x']))
                 sys.exit()
 
