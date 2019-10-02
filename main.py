@@ -82,8 +82,8 @@ def M(strats, i, j):
 def main():
     t0 = time.time()
 
-    n = 6
-    k = 4
+    n = 12
+    k = 3
 
     parts_full = tuple(P(n, k))
     strats_full = tuple(S(parts_full))
@@ -133,6 +133,7 @@ def main():
                 bounds = (0., 1.),
             )
             if res['success']:
+                pprint(('n, k:', (n,k)))
                 pprint(('combi:', combi))
                 pprint(('len(comb):', len(comb)))
                 pprint(('MI shape:', MI.shape))
@@ -141,6 +142,7 @@ def main():
                     row for row in zip(
                         [tuple(sorted(s, reverse=True)) for s in strats],
                         ['%.5f' % n for n in res['x']],
+                        -A_ub.sum(0),
                     ) if float(row[1]) > 1e-5
                 ), key=lambda row: row[1], reverse=True))
                 pprint(sum(res['x']))
